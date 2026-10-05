@@ -1,0 +1,103 @@
+### Figure 1
+$ gcc --version | head -n 1
+gcc (Ubuntu 15.2.0-16ubuntu1) 15.2.0
+$ readelf --version | head -n 1
+GNU readelf (GNU Binutils for Ubuntu) 2.46
+$ ldd --version | head -n 1
+ldd (Ubuntu GLIBC 2.43-2ubuntu2.4) 2.43
+$ git --version
+git version 2.53.0
+
+### Figure 2
+$ cat procinfo.c
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <time.h>
+
+int main(void) {
+    // Get current process ID
+    pid_t my_pid = getpid();
+    pid_t my_ppid = getppid();
+
+    // Get current time
+    time_t current_time = time(NULL);
+    struct tm *time_info = localtime(&current_time);
+
+    // Format and display information
+    printf("=== Process Information ===\n");
+    printf("My Process ID (PID): %d\n", my_pid);
+    printf("Parent Process ID:   %d\n", my_ppid);
+    printf("Current Time:        %s", asctime(time_info));
+    printf("Executable Path:     /proc/self/exe\n");
+
+    return 0;
+}
+
+### Figure 3
+$ gcc -Wall -Wextra procinfo.c -o procinfo
+$ ./procinfo
+=== Process Information ===
+My Process ID (PID): 8280
+Parent Process ID:   8264
+Current Time:        Sun Oct  4 16:28:47 2026
+Executable Path:     /proc/self/exe
+
+### Figure 4
+$ ls -l /usr/include/stdio.h /usr/include/unistd.h
+-rw-r--r-- 1 root root 34258 Sep  3 14:09 /usr/include/stdio.h
+-rw-r--r-- 1 root root 45053 Sep  3 14:09 /usr/include/unistd.h
+$ grep -n -m 1 "extern int printf" /usr/include/stdio.h
+370:extern int printf (const char *__restrict __format, ...);
+$ grep -n -m 1 "getpid (void)" /usr/include/unistd.h
+650:extern __pid_t getpid (void) __THROW;
+
+### Figure 5
+$ ls -lh /lib/x86_64-linux-gnu/libc.so.6
+ls: cannot access '/lib/x86_64-linux-gnu/libc.so.6': No such file or directory
+$ ls -lh /usr/lib/x86_64-linux-gnu/libc.a
+ls: cannot access '/usr/lib/x86_64-linux-gnu/libc.a': No such file or directory
+
+### Figure 6
+$ gcc procinfo.c -o procinfo_dynamic
+$ gcc -static procinfo.c -o procinfo_static
+$ ls -lh procinfo_dynamic procinfo_static
+-rwxrwxr-x 1 dada dada  70K Oct  4 16:28 procinfo_dynamic
+-rwxrwxr-x 1 dada dada 769K Oct  4 16:28 procinfo_static
+$ file procinfo_dynamic procinfo_static
+procinfo_dynamic: ELF 64-bit LSB pie executable, ARM aarch64, version 1 (SYSV), dynamically linked, interpreter /lib/ld-linux-aarch64.so.1, BuildID[sha1]=5fb185c839571a72c10198008c673b2cad0fc404, for GNU/Linux 3.7.0, not stripped
+procinfo_static:  ELF 64-bit LSB executable, ARM aarch64, version 1 (GNU/Linux), statically linked, BuildID[sha1]=d5c845c4a4b410fa02042b0047cceec2e3e95ae0, for GNU/Linux 3.7.0, not stripped
+
+### Figure 7
+$ readelf -d procinfo_dynamic | grep NEEDED
+ 0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]
+ 0x0000000000000001 (NEEDED)             Shared library: [ld-linux-aarch64.so.1]
+$ readelf -d procinfo_static
+
+There is no dynamic section in this file.
+
+### Figure 8
+$ ldd procinfo_dynamic
+	linux-vdso.so.1 (0x0000e84d9ab7a000)
+	libc.so.6 => /usr/lib/aarch64-linux-gnu/libc.so.6 (0x0000e84d9a930000)
+	/lib/ld-linux-aarch64.so.1 (0x0000e84d9ab30000)
+$ ldd procinfo_static
+	not a dynamic executable
+
+### Figure 9
+$ readelf -h procinfo_dynamic | grep -E "Magic|Class|Data|Type|Machine|Entry point"
+  Magic:   7f 45 4c 46 02 01 01 00 00 00 00 00 00 00 00 00 
+  Class:                             ELF64
+  Data:                              2's complement, little endian
+  Type:                              DYN (Position-Independent Executable file)
+  Machine:                           AArch64
+  Entry point address:               0x900
+
+### Figure 10
+$ readelf -W -l procinfo_dynamic | grep -E "INTERP|LOAD|GNU_STACK|interpreter"
+  INTERP         0x000294 0x0000000000000294 0x0000000000000294 0x00001b 0x00001b R   0x1
+      [Requesting program interpreter: /lib/ld-linux-aarch64.so.1]
+  LOAD           0x000000 0x0000000000000000 0x0000000000000000 0x000cc4 0x000cc4 R E 0x10000
+  LOAD           0x00fd40 0x000000000001fd40 0x000000000001fd40 0x0002d0 0x0002d8 RW  0x10000
+  GNU_STACK      0x000000 0x0000000000000000 0x0000000000000000 0x000000 0x000000 RW  0x10
+
